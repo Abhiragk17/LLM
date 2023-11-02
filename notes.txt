@@ -1,0 +1,17 @@
+Langchain -  framework that helps dev to combine LLMs with external sources
+    https://www.wallstreetmojo.com/top-investment-banking-books/
+lets say we have a document or a link and we want to connect these sourcees of data with LLMs like chatgpt and answer users customers
+
+
+working - it first divides the data into chunks(vectors) and stores it in a database.When a user ask a question,it is sent to the language model and the question is divided into chunks and these chunks are compared to the database where the data is stored.relevant chunks are then fetched and passed to the LLM.Now the LLM has initial input as well as relevant info,hence it can then answer the question.
+
+usecases - studying on the basis of syllabus,personal asistant,customer data chatbot
+
+
+components -
+    LLM wrappers - used to connect langchain with LLM 
+    prom
+
+
+
+https://github.com/AIAnytime/Search-in-Website-Streamlit-App
