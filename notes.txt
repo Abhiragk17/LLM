@@ -11,7 +11,7 @@ usecases - studying on the basis of syllabus,personal asistant,customer data cha
 components -
     LLM wrappers - used to connect langchain with LLM 
     prom
+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
 
-
-
+https://www.youtube.com/watch?v=aKkr_lgmihw
 https://github.com/AIAnytime/Search-in-Website-Streamlit-App

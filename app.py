@@ -16,30 +16,23 @@ load_dotenv()
 
 os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
 openai.api_key = os.getenv("OPENAI_API_KEY")
-
+# print(openai)
 @st.cache_resource
 def get_url_name(url):
     parsed_url = urlparse(url)
     return parsed_url.netloc
-
-def _get_text_splitter():
-    return RecursiveCharacterTextSplitter(
-        chunk_size = 500,
-        chunk_overlap  = 20,
-        length_function = len,
-        add_start_index = True,
-    )
+    
 
 class WebpageQATool(BaseTool):
     name = "query_webpage"
     description = "Browse a webpage and retrieve the information and answers relevant to the question. Please use bullet points to list the answers"
-    text_splitter: RecursiveCharacterTextSplitter = Field(default_factory=_get_text_splitter)
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size = 500,chunk_overlap = 20,length_function = len)
     qa_chain: BaseCombineDocumentsChain
 
     def _run(self, url: str, question: str) -> str:
         response = requests.get(url)
         page_content = response.text
-        print(page_content)
+        # print(page_content)
         docs = [Document(page_content=page_content, metadata={"source": url})]
         web_docs = self.text_splitter.split_documents(docs)
         results = []
