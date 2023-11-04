@@ -54,7 +54,6 @@ def run_llm(url, query):
     return result
 
 st.markdown("<h1 style='text-align: center; color: green;'>Info Retrieval from Website 🦜 </h1>", unsafe_allow_html=True)
-st.markdown("<h3 style='text-align: center; color: green;'>Developed by <a href='https://github.com/AIAnytime'>AI Anytime with ❤️ </a></h3>", unsafe_allow_html=True)
 st.markdown("<h2 style='text-align: center; color:red;'>Enter the Website URL 👇</h2>", unsafe_allow_html=True)
 
 input_url = st.text_input("Enter the URL")
