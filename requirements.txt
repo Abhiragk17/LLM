@@ -1,6 +1,9 @@
 langchain
-openai
+openai==0.28.1
 streamlit
 python-dotenv
 pydantic
-trafilatura
+faiss-gpu
+unstructured
+tiktoken
+python-magic-bin
