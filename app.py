@@ -69,4 +69,4 @@ if st.session_state.messages[-1]["role"] != "assistant":
             final_answer = _run(url=input_url, question=prompt)
             message = {"role": "assistant", "content": final_answer}
             st.session_state.messages.append(message)
-            st.experimental_rerun()
+            st.rerun()
