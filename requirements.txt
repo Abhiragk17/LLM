@@ -6,4 +6,4 @@ pydantic
 faiss-gpu
 unstructured
 tiktoken
-python-magic-bin
+python-magic
