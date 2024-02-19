@@ -7,3 +7,5 @@ faiss-gpu
 unstructured
 tiktoken
 python-magic
+redis
+redisvl

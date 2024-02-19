@@ -1,19 +1,24 @@
 import streamlit as st
 from urllib.parse import urlparse
+from langchain.chat_models import ChatOpenAI
 import os
 import openai
-import requests
-from langchain.prompts import PromptTemplate
+from langchain.tools.base import BaseTool
 from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.vectorstores import FAISS
+from langchain.vectorstores.redis import Redis
 from langchain.chains.question_answering import load_qa_chain
 from langchain.llms import OpenAI
-from langchain.document_loaders import WebBaseLoader
+from langchain.document_loaders import UnstructuredURLLoader
 from dotenv import load_dotenv
 load_dotenv()
 openai_api_key = os.getenv("OPENAI_API_KEY")
 os.environ["OPENAI_API_KEY"] = openai_api_key
+
+
+
+
 
 @st.cache_resource
 def get_url_name(url):
@@ -21,28 +26,30 @@ def get_url_name(url):
     return parsed_url.netloc
 
 def _run(url: str, question: str) -> str:
-    loaders = WebBaseLoader(web_path=url)
+    loaders = UnstructuredURLLoader(urls=[url])
     data = loaders.load()
-    print(data)
+    print(data) 
     text_splitter = CharacterTextSplitter(separator='\n', chunk_size=2000, chunk_overlap=200)
     docs = text_splitter.split_documents(data)
     print(len(docs))
     embeddings = OpenAIEmbeddings()
-    docsearch = FAISS.from_documents(docs, embeddings)
-    prompt = PromptTemplate.from_template("""
-    Given the below context, answer the following question:
-    Context: {context}
-    Question: {question}""")
-    # chain = load_qa_chain(, chain_type="stuff")
-    docs = docsearch.similarity_search(question)
-    prompt = PromptTemplate.from_template("""
-    Given the below context, answer the following question:
-    Context: {context}
-    Question: {question}""")
-    prompt = prompt.format(context = docs,question=question)
-    llm = OpenAI()
-    response = llm.invoke(prompt)
-    return response['answer']
+
+    # r = rd.Redis(
+    # host='redis-11818.c301.ap-south-1-1.ec2.cloud.redislabs.com',
+    # port=11818,
+    # password='Zw569N4lfVIA8mILjyGNIR6WK0tXdrHF')
+
+
+    rds = Redis.from_texts(
+    docs,
+    embeddings,
+    redis_url="redis://localhost:6379",
+    index_name="users",
+    )
+
+    docs = rds.similarity_search(query= question,k=3)
+    chain = load_qa_chain(OpenAI(), chain_type="stuff")
+    return chain.run(input_documents=docs, question=question)
 
 
 st.set_page_config(page_title="💬 AI-Chat")
