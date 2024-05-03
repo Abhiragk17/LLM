@@ -1,3 +1,4 @@
+from langchain_openai import ChatOpenAI
 import streamlit as st
 from urllib.parse import urlparse
 import requests
@@ -9,17 +10,25 @@ from langchain_community.document_loaders import WebBaseLoader
 from langchain_chroma import Chroma
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.runnables import RunnablePassthrough
+from langchain_community.vectorstores.elasticsearch import ElasticsearchStore
 import re
 import os
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.embeddings import HuggingFaceBgeEmbeddings
 from langchain.prompts import PromptTemplate
-from langchain.chains.question_answering import load_qa_chain
 from dotenv import load_dotenv
-import chromadb
+from elasticsearch import Elasticsearch
+from langchain_community.vectorstores import LanceDB
+from langchain_community.embeddings import OpenAIEmbeddings
+
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+
 
 load_dotenv()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-os.environ["GOOGLE_API_KEY"] = GOOGLE_API_KEY
+ES_URL = os.getenv("ES_URL")
+ES_API_KEY = os.getenv("ES_API_KEY")
+# os.environ["GOOGLE_API_KEY"] = GOOGLE_API_KEY
+# DB_FAISS_PATH = 'vectorstore/db_faiss'
 
 @st.cache_resource
 def get_url_name(url):
@@ -28,7 +37,7 @@ def get_url_name(url):
 
 def Get_formatted_chat_history(chat_history) -> str:
     chat_history_formatted = ""
-    for message in chat_history[-4:][::-1]:  # Iterate over last 3 messages in reverse order
+    for message in chat_history[-3:][::-1]:  # Iterate over last 3 messages in reverse order
         if isinstance(message, HumanMessage):
             content = message.content
             chat_history_formatted += "User : " + content + "\n"
@@ -47,23 +56,17 @@ def preprocess_data(data : str) -> str:
     """
     return data 
 
-@st.cache_resource
-def similarity_search_chroma(index_name,query,k):
-    modelPath = "sentence-transformers/all-MiniLM-l6-v2"
-    model_kwargs = {'device':'cpu'}
-    embeddings = HuggingFaceEmbeddings(
-        model_name=modelPath,     # Provide the pre-trained model's path
-        model_kwargs=model_kwargs, # Pass the model configuration options
-    )
-    persistent_client = chromadb.PersistentClient()
-    collection = persistent_client.get_or_create_collection(index_name)
-    langchain_chroma = Chroma(
-    client=persistent_client,
-    collection_name=index_name,
-    embedding_function=embeddings,
-    )
-    retriever = langchain_chroma.as_retriever(search_kwargs = {"k": k})
-    return retriever
+def similarity_search_elastic(index_name,query,k):
+    embeddings = OpenAIEmbeddings(api_key=OPENAI_API_KEY)
+    Vectordb = ElasticsearchStore(es_url=ES_URL, index_name=index_name, embedding=embeddings, es_api_key=ES_API_KEY)
+    docs = Vectordb.similarity_search(k=k, query=query)
+    # docs_content = ''
+    # i = 1
+    # for doc in docs:
+    #     docs_content += doc.page_content
+    #     i += 1
+    # return docs_content
+    return docs
 
 def ExtractData(filepath):
     loader = WebBaseLoader(web_path=filepath)
@@ -81,21 +84,10 @@ def ExtractData(filepath):
 @st.cache_resource
 def create_embeddings(index_name,file_path):
     try:
-        modelPath = "sentence-transformers/all-MiniLM-l6-v2"
-        model_kwargs = {'device':'cpu'}
-        embeddings = HuggingFaceEmbeddings(
-            model_name=modelPath,     # Provide the pre-trained model's path
-            model_kwargs=model_kwargs, # Pass the model configuration options
-        )
-        persistent_client = chromadb.PersistentClient()
-        collection = persistent_client.get_or_create_collection(index_name)
-        langchain_chroma = Chroma(
-        client=persistent_client,
-        collection_name=index_name,
-        embedding_function=embeddings,
-        )
-        print("There are", langchain_chroma._collection.count(), "in the collection")
-        if langchain_chroma._collection.count() > 0:
+        embeddings = OpenAIEmbeddings(api_key=OPENAI_API_KEY)
+        es_client = Elasticsearch(api_key=ES_API_KEY,hosts=[ES_URL])
+        print(f"es client : {es_client}")
+        if es_client.indices.exists(index=index_name):
             print(f"Index Exists ")
             return True
         else:
@@ -109,7 +101,14 @@ def create_embeddings(index_name,file_path):
             # print(f'Length : {len(splits)}')
             # Vectordb = ElasticsearchStore(es_connection=es_client,index_name=index_name, embedding=embeddings)
             # print(f'db : {Vectordb}')
-            db = langchain_chroma.from_documents(splits,embeddings)
+            db = ElasticsearchStore.from_documents(
+                    splits,
+                    embeddings,
+                    es_url=ES_URL,
+                    index_name=index_name,
+                    es_api_key=ES_API_KEY,
+                    bulk_kwargs={"request_timeout" : 600}
+                )
             if db:
                     print(f'embeddings created with index name : {index_name}')
                     return True
@@ -120,8 +119,9 @@ def create_embeddings(index_name,file_path):
         return False
     
 def _run(question: str,chat_history : str,index_name : str) -> str:
-    retriever = similarity_search_chroma(index_name,question,5)
-    #docs = "\n".join([f"{doc.page_content}" for doc in docs])
+    docs = similarity_search_elastic(index_name,question,5)
+    context = "\n\n".join([doc.page_content for doc in docs])
+    print(f'Context : {context}')
     # chain = load_qa_chain(, chain_type="stuff")
     prompt = ChatPromptTemplate.from_messages([
         ("system","""
@@ -132,18 +132,24 @@ def _run(question: str,chat_history : str,index_name : str) -> str:
 
     VectorDB content - {context}
     """),
-        ("human", """User question: {user_question}
+        ("human", """User question: {question}
         note - Do not mention the VectorDB in your answer"""),
     ])
-    llm = ChatGoogleGenerativeAI(model="gemini-pro")
-    chain = ({"context" : retriever,"user_question" : RunnablePassthrough(), "chat_history" : chat_history} | prompt | llm | StrOutputParser())
-    result = chain.invoke(question)
-    print(result)
+    # prompt = prompt.format_messages(context=context,question=question,chat_history=chat_history)
+    # llm = ChatGoogleGenerativeAI(model="gemini-pro")
+    llm = ChatOpenAI()
+    retrieval_chain = (prompt
+        | llm
+        | StrOutputParser()
+    )
+    result = retrieval_chain.stream({"context": context, "question": question,"chat_history" : chat_history})
+    print(f'Result : {result}')
     return result
 
 
-st.set_page_config(page_title="💬 AI-Chat")
+st.set_page_config(page_title="💬 WebChat -AI")
 # Taking input URL
+index_name = ""
 with st.sidebar:
     input_url = st.text_input("Enter the Website URL", key="url_input")
     if len(input_url) > 0:
@@ -158,7 +164,7 @@ with st.sidebar:
 # session state
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = [
-        AIMessage(content="Hello, I am a bot. How can I help you?"),
+        AIMessage(content="Hello, I am a WebChatAI bot. How can I help you?"),
     ]
 
 # conversation
@@ -171,7 +177,7 @@ for message in st.session_state.chat_history:
             st.write(message.content)
 
 #chat history
-chat_history = st.session_state.chat_history[-3]
+chat_history = st.session_state.chat_history
 chat_history_str = Get_formatted_chat_history(chat_history)
 print(f'{len(chat_history)}')
 print(f"chat history : {chat_history_str}")
