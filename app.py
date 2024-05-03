@@ -7,17 +7,13 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import WebBaseLoader
-from langchain_chroma import Chroma
-from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.runnables import RunnablePassthrough
 from langchain_community.vectorstores.elasticsearch import ElasticsearchStore
 import re
 import os
-from langchain_community.embeddings import HuggingFaceBgeEmbeddings
 from langchain.prompts import PromptTemplate
 from dotenv import load_dotenv
 from elasticsearch import Elasticsearch
-from langchain_community.vectorstores import LanceDB
 from langchain_community.embeddings import OpenAIEmbeddings
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
