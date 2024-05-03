@@ -1,11 +1,9 @@
 python-dotenv
 tiktoken
 python-magic
-langchain-google-genai
 langchain
 langchain_openai
 streamlit
 langchain-community
-transformers
-sentence-transformers
-langchain-chroma
+langchain_elasticsearch
+bs4
